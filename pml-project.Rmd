@@ -1,0 +1,105 @@
+---
+title: "Predicting Weight-Lifting Quality"
+author: "Aaron Ferrucci"
+date: "October 17, 2015"
+output: 
+  html_document: 
+    fig_height: 4
+    fig_width: 6
+references:
+- id: Ugulino2012
+  title: "Wearable Computing: Accelerometers' Data Classification of Body Postures and Movements"
+  author:
+  - family: Ugulino, W.; Cardador, D.; Vega, K.; Velloso, E.; Milidiu, R.; Fuks, H.
+  container-title: Proceedings of 21st Brazilian Symposium on Artificial Intelligence
+  URL: 'http://groupware.les.inf.puc-rio.br/har'
+---
+
+
+``` {r echo=FALSE, include=F, messages=F, warnings=F, results="hide"}
+# Load libraries, data
+library(caret)
+```
+
+## Overview
+TBD - this will be easy to write once I know what I'm doing.
+
+## Preliminaries
+The test and training data sets are provided as files in .csv format. First,
+I'll load in the training data set and do some basic exploratory analysis.
+
+``` {r echo=T}
+train <- read.csv("pml-training.csv")
+dim(train)
+```
+
+The data set consists of `r nrow(train)` observations of `r ncol(train)`
+variables.  As explained in [@Ugulino2012], the observations are of 6
+individuals performing a weight-lifting excercise correctly, and then
+incorrectly in a number of ways. Correctness or not is encoded in the
+`classe` variable of the dataset, which is a factor variable of 5 levels, with
+the following interpretation:
+
+* A: exactly according to the specification
+* B: throwing the elbows to the front
+* C: lifting the dumbbell only halfway
+* D: lowering the dumbbell only halfway
+* E: and throwing the hips to the front 
+
+A contingency table by subject and class shows how many of each type of measurement were made, for each individual:
+``` {r}
+table(train$classe, train$user_name)
+```
+
+To improve scalablity of any classification algorithms, it's worth trying to
+reduce the data size to only those measurements which matter. 
+
+Looking over the measurements, it's clear that a large number of the
+measurements are NAs or empty string (""):
+
+``` {r}
+nas <- apply(train, 2, function(x) sum(is.na(x) || x == ""))
+t <- table(nas)
+t
+```
+
+Noting that when a measurement contains any missing values, it contains a 
+large number of them (`r t[2]` out of `r nrow(train)` total measurements).
+Looking closer, I
+see that the missing measurements attain values when the variable
+`r "new_window"` is "yes"; the names of the missing measurements indicate that
+these are summary statistics (min, max, avg, etc.) - in other words, they are
+transformed tidy covariates or Level 2 covariates. In the interest of letting
+a machine learning algorithm discover the necessary variables, I will discard
+all transformed covariates.
+
+``` {r}
+train <- train[, nas == 0]
+```
+
+Next, we can eliminate more less-useful covariates via `nearZeroVar`:
+
+``` {r}
+nzv <- nearZeroVar(train, saveMetrics=T)
+names(train)[nzv$nzv]
+train <- train[,!nzv$nzv]
+```
+
+Right, we already knew variable `r "new_window"` wasn't going to be useful.
+
+Finally, we can discard a few covariates based on "common sense". For example,
+the `r "X"` value is a simple index over all of the data; there are also a 
+few timestamp values that are unlikely to be predictors for correct vs. 
+incorrect weightlifting technique.
+
+``` {r}
+train <- train[, -grep("timestamp|X|num_window", names(train))]
+```
+
+We've reduced the number of measurements to `r ncol(train)`, which is still a
+rather large number. Next, use principal component analysis to further reduce 
+the number of measurements, without losing too much information.
+
+
+
+## References
