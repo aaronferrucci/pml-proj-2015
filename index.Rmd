@@ -3,7 +3,7 @@ title: "Predicting Weight-Lifting Quality"
 author: "Aaron Ferrucci"
 date: "October 17, 2015"
 output: 
-  html_document: 
+  html_document:
     fig_height: 4
     fig_width: 6
 references:
@@ -35,7 +35,7 @@ dim(train)
 
 The data set consists of `r nrow(train)` observations of `r ncol(train)`
 variables.  As explained in [@Ugulino2012], the observations are of 6
-individuals performing a weight-lifting excercise correctly, and then
+individuals performing a weight-lifting exercise correctly, and then
 incorrectly in a number of ways. Correctness or not is encoded in the
 `classe` variable of the dataset, which is a factor variable of 5 levels, with
 the following interpretation:
