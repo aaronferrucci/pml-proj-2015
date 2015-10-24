@@ -1,1 +1,5 @@
 .*.swp
+problem_id_*.txt
+index_cache
+index_files
+.Rhistory
