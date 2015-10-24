@@ -19,6 +19,7 @@ references:
 ``` {r echo=FALSE, include=F, messages=F, warnings=F, results="hide"}
 # Load libraries, data
 library(caret)
+library(randomForest)
 ```
 
 ## Overview
@@ -29,11 +30,11 @@ The test and training data sets are provided as files in .csv format. First,
 I'll load in the training data set and do some basic exploratory analysis.
 
 ``` {r echo=T}
-train <- read.csv("pml-training.csv")
-dim(train)
+train_all <- read.csv("pml-training.csv")
+dim(train_all)
 ```
 
-The data set consists of `r nrow(train)` observations of `r ncol(train)`
+The data set consists of `r nrow(train_all)` observations of `r ncol(train_all)`
 variables.  As explained in [@Ugulino2012], the observations are of 6
 individuals performing a weight-lifting exercise correctly, and then
 incorrectly in a number of ways. Correctness or not is encoded in the
@@ -44,13 +45,14 @@ the following interpretation:
 * B: throwing the elbows to the front
 * C: lifting the dumbbell only halfway
 * D: lowering the dumbbell only halfway
-* E: and throwing the hips to the front 
+* E: throwing the hips to the front 
 
 A contingency table by subject and class shows how many of each type of measurement were made, for each individual:
 ``` {r}
-table(train$classe, train$user_name)
+table(train_all$classe, train_all$user_name)
 ```
 
+## Reducing Covariates
 To improve scalablity of any classification algorithms, it's worth trying to
 reduce the data size to only those measurements which matter. 
 
@@ -58,13 +60,13 @@ Looking over the measurements, it's clear that a large number of the
 measurements are NAs or empty string (""):
 
 ``` {r}
-nas <- apply(train, 2, function(x) sum(is.na(x) || x == ""))
+nas <- apply(train_all, 2, function(x) sum(is.na(x) || x == ""))
 t <- table(nas)
 t
 ```
 
 Noting that when a measurement contains any missing values, it contains a 
-large number of them (`r t[2]` out of `r nrow(train)` total measurements).
+large number of them (`r t[2]` out of `r nrow(train_all)` total measurements).
 Looking closer, I
 see that the missing measurements attain values when the variable
 `r "new_window"` is "yes"; the names of the missing measurements indicate that
@@ -74,18 +76,16 @@ a machine learning algorithm discover the necessary variables, I will discard
 all transformed covariates.
 
 ``` {r}
-train <- train[, nas == 0]
+train_all <- train_all[, nas == 0]
 ```
 
 Next, we can eliminate more less-useful covariates via `nearZeroVar`:
 
 ``` {r}
-nzv <- nearZeroVar(train, saveMetrics=T)
-names(train)[nzv$nzv]
-train <- train[,!nzv$nzv]
+nzv <- nearZeroVar(train_all, saveMetrics=T)
+names(train_all)[nzv$nzv]
+train_all <- train_all[,!nzv$nzv]
 ```
-
-Right, we already knew variable `r "new_window"` wasn't going to be useful.
 
 Finally, we can discard a few covariates based on "common sense". For example,
 the `r "X"` value is a simple index over all of the data; there are also a 
@@ -93,13 +93,80 @@ few timestamp values that are unlikely to be predictors for correct vs.
 incorrect weightlifting technique.
 
 ``` {r}
-train <- train[, -grep("timestamp|X|num_window", names(train))]
+train_all <- train_all[, -grep("timestamp|X|num_window", names(train_all))]
 ```
 
-We've reduced the number of measurements to `r ncol(train)`, which is still a
-rather large number. Next, use principal component analysis to further reduce 
-the number of measurements, without losing too much information.
+I've reduced the number of measurements to `r ncol(train_all)`, which is a big
+improvement over the original data size.
 
+## Preparing for Cross-Validation
+I will separate the training set into train and validation subsets, and use 
+the validation subset error as my out-of-sample error estimate.
+``` {r}
+dp <- createDataPartition(y=train_all$classe, p=0.75, list=F) 
+train <- train_all[dp,]
+validate <- train_all[-dp,]
+```
 
+## Random Forest
+A random forest is trained on the separated training data. Contrary to some
+rumors, creation of the model takes only a few minutes, even on my 
+ancient laptop.
+``` {r cache=TRUE}
+set.seed(12345)
+rf <- randomForest(classe ~ ., data=train)
+rf
+```
 
+### Examining the Model: Variable Importance
+Now that the model is trained, it's interesting to have a look at variable
+importance. Can we trim this model, for better scalability, without sacrificing
+accuracy?
+``` {r}
+order <- order(-rf$importance)
+plot(rf$importance[order])
+sorted_importance <-
+  data.frame(
+    var = rownames(rf$importance)[order],
+    importance = rf$importance[order]
+  )
+head(sorted_importance, n=10)
+```
+
+The plot of variable importance looks rather promising - it's likely that 10 or
+15 of the "least important" variables could be trimmed without losing a lot of
+accuracy.
+
+### Examining the Model: Estimate Out-of-Sample Error
+I'll use the reserved validation data to estimate the out-of-sample data. 
+The concept here is that since we don't have access to the test data, we
+estimate the error on the test set using training data which was separated
+out before building the model.
+
+How does the model perform on the validation data?
+``` {r}
+modelError <- function(fit, data) {
+  missClass <- sum(predict(fit, data) == data$classe)
+  err <- missClass / nrow(data)
+  return(err * 100)
+}
+
+modelError(rf, validate)
+```
+
+``` {r eval=FALSE, echo=FALSE}
+# ``` {r eval=T, echo=T}
+test <- read.csv("pml-testing.csv")
+answers <- predict(rf, test)
+pml_write_files = function(x){
+  n = length(x)
+  for(i in 1:n) {
+    filename = paste0("problem_id_",i,".txt")
+    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+answers
+pml_write_files(answers)
+```
 ## References
+
