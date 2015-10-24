@@ -18,6 +18,7 @@ references:
 
 ``` {r echo=FALSE, include=F, messages=F, warnings=F, results="hide"}
 # Load libraries, data
+set.seed(12345)
 library(caret)
 library(randomForest)
 ```
@@ -113,7 +114,6 @@ A random forest is trained on the separated training data. Contrary to some
 rumors, creation of the model takes only a few minutes, even on my 
 ancient laptop.
 ``` {r cache=TRUE}
-set.seed(12345)
 rf <- randomForest(classe ~ ., data=train)
 rf
 ```
