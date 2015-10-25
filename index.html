@@ -70,7 +70,7 @@ img {
 
 <div id="overview" class="section level2">
 <h2>Overview</h2>
-<p>Accelometer devices make it possible to collect data from subjects performing weight-lifting exercises. It’s possible that user technique during such exercises may be significant - indicating risk of injury, or low rate of improvement. Quantifying the <em>quality</em> of exercise; whether in real time, or in post-processing - could be a valuable training aid.</p>
+<p>Accelometer devices make it possible to collect data from subjects performing weight-lifting exercises. It’s possible that user technique during such exercises may be significant - indicating risk of injury, or low rate of improvement. Quantifying the <em>quality</em> of exercise; whether in real time, or in post-processing could be a valuable training aid.</p>
 <p>This project takes as input a set of data gathered during weight-lifting exercises, and attempts to discern, via machine learning classification modeling, whether the exercises were done correctly or incorrectly.</p>
 </div>
 <div id="preliminaries" class="section level2">
@@ -105,7 +105,7 @@ t</code></pre>
 <pre><code>## nas
 ##     0 19216 
 ##    60   100</code></pre>
-<p>When a measurement contains any missing values, it contains a large number of them (19216 out of 19622 total measurements). Looking closer, I see that the missing measurements have actual values when the variable new_window is “yes”. The names of the missing measurements indicate that these are summary statistics (min, max, avg, etc.) - in other words, they are transformed tidy covariates / Level 2 covariates. In the interest of letting a machine learning algorithm discover the necessary variables, I will discard all transformed covariates.</p>
+<p>When a measurement contains any missing values, it contains a large number of them (19216 out of 19622 total measurements). Looking closer, I see that variables which have mostly missing values have actual values when the variable new_window is “yes”. The names of those variables indicate that they are summary statistics (min, max, avg, etc.) - in other words, they are transformed tidy or Level 2 covariates. In the interest of letting the machine learning algorithm discover the necessary variables, I will discard all these transformed covariates.</p>
 <pre class="r"><code>train_all &lt;- train_all[, nas == 0]</code></pre>
 <p>Next, I’ll find and eliminate any covariates which have little impact on the outcome (via <code>nearZeroVar</code>):</p>
 <pre class="r"><code>nzv &lt;- nearZeroVar(train_all, saveMetrics=T)
