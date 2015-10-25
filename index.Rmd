@@ -24,7 +24,15 @@ library(randomForest)
 ```
 
 ## Overview
-TBD - this will be easy to write once I know what I'm doing.
+Accelometer devices make it possible to collect data from subjects
+performing weight-lifting exercises. It's possible that user technique
+during such exercises may be significant - indicating risk of injury, or
+low rate of improvement. Quantifying the _quality_ of exercise; whether
+in real time, or in post-processing - could be a valuable training aid.
+
+This project takes as input a set of data gathered during weight-lifting
+exercises, and attempts to discern, via machine learning classification
+modeling, whether the exercises were done correctly or incorrectly.
 
 ## Preliminaries
 The test and training data sets are provided as files in .csv format. First,
@@ -32,7 +40,6 @@ I'll load in the training data set and do some basic exploratory analysis.
 
 ``` {r echo=T}
 train_all <- read.csv("pml-training.csv")
-dim(train_all)
 ```
 
 The data set consists of `r nrow(train_all)` observations of `r ncol(train_all)`
@@ -57,22 +64,22 @@ table(train_all$classe, train_all$user_name)
 To improve scalablity of any classification algorithms, it's worth trying to
 reduce the data size to only those measurements which matter. 
 
-Looking over the measurements, it's clear that a large number of the
-measurements are NAs or empty string (""):
+The dataset contains a large number measurements which are NA or empty string
+(""):
 
 ``` {r}
-nas <- apply(train_all, 2, function(x) sum(is.na(x) || x == ""))
+nas <- apply(train_all, 2, function(x) sum(ifelse(is.na(x), 1, 1 * (x == ""))))
 t <- table(nas)
 t
 ```
 
-Noting that when a measurement contains any missing values, it contains a 
-large number of them (`r t[2]` out of `r nrow(train_all)` total measurements).
-Looking closer, I
-see that the missing measurements attain values when the variable
-`r "new_window"` is "yes"; the names of the missing measurements indicate that
+When a measurement contains any missing values, it contains a 
+large number of them (`r rownames(t)[2]` out of `r nrow(train_all)` 
+total measurements).  Looking closer, I
+see that the missing measurements have actual values when the variable
+`r "new_window"` is "yes". The names of the missing measurements indicate that
 these are summary statistics (min, max, avg, etc.) - in other words, they are
-transformed tidy covariates or Level 2 covariates. In the interest of letting
+transformed tidy covariates / Level 2 covariates. In the interest of letting
 a machine learning algorithm discover the necessary variables, I will discard
 all transformed covariates.
 
@@ -80,15 +87,16 @@ all transformed covariates.
 train_all <- train_all[, nas == 0]
 ```
 
-Next, we can eliminate more less-useful covariates via `nearZeroVar`:
+Next, I'll find and eliminate any covariates which have little impact on
+the outcome (via `nearZeroVar`):
 
 ``` {r}
 nzv <- nearZeroVar(train_all, saveMetrics=T)
-names(train_all)[nzv$nzv]
 train_all <- train_all[,!nzv$nzv]
 ```
 
-Finally, we can discard a few covariates based on "common sense". For example,
+Finally, I'll manually discard a few covariates based on "common sense". 
+For example,
 the `r "X"` value is a simple index over all of the data; there are also a 
 few timestamp values that are unlikely to be predictors for correct vs. 
 incorrect weightlifting technique.
@@ -102,60 +110,134 @@ improvement over the original data size.
 
 ## Preparing for Cross-Validation
 I will separate the training set into train and validation subsets, and use 
-the validation subset error as my out-of-sample error estimate.
+the validation subset error as my out-of-sample error estimate. A good rule
+of thumb is to separate a data set into 60% training, 20% validation and 20%
+test. In this case, the test data has already been separated out. By the rule 
+of thumb, the training and validation data are in a 3:1 ratio, so I'll
+maintain that for my training and valaidation data with `p=0.75`.
 ``` {r}
 dp <- createDataPartition(y=train_all$classe, p=0.75, list=F) 
 train <- train_all[dp,]
 validate <- train_all[-dp,]
 ```
 
-## Random Forest
-A random forest is trained on the separated training data. Contrary to some
-rumors, creation of the model takes only a few minutes, even on my 
-ancient laptop.
+## Random Forest - Initial Model
+Using the separated training data, I'll train a random forest, using all the
+default options. Despite the rumors, creation of the model takes only 
+a few minutes, even on my ancient laptop. However, an attempt to build the
+same model with caret's `train` function took much longer - so I avoided 
+that.
 ``` {r cache=TRUE}
 rf <- randomForest(classe ~ ., data=train)
 rf
 ```
 
-### Examining the Model: Variable Importance
-Now that the model is trained, it's interesting to have a look at variable
-importance. Can we trim this model, for better scalability, without sacrificing
-accuracy?
-``` {r}
-order <- order(-rf$importance)
-plot(rf$importance[order])
-sorted_importance <-
-  data.frame(
-    var = rownames(rf$importance)[order],
-    importance = rf$importance[order]
-  )
-head(sorted_importance, n=10)
-```
+### Examining the Initial Model: Estimate Out-of-Sample Error
+### OOB error
+One of the figures of merit reported for the random forest model is the
+OOB estimate. In theory, this estimate is an accurate estimate of the
+out-of-sample error.  For this model, the OOB estimate was very low, 
+indicating a good fit without danger of overfitting.
 
-The plot of variable importance looks rather promising - it's likely that 10 or
-15 of the "least important" variables could be trimmed without losing a lot of
-accuracy.
-
-### Examining the Model: Estimate Out-of-Sample Error
-I'll use the reserved validation data to estimate the out-of-sample data. 
-The concept here is that since we don't have access to the test data, we
-estimate the error on the test set using training data which was separated
-out before building the model.
+### Out-of-Sample error: Home brew
+For pedagogical reasons, I'll implement my own out-of-sample estimate, using 
+the reserved validation data.  The concept here is that since I don't have 
+access to the test data, I estimate the error on the test set using training 
+data which was separated out before building the model.
 
 How does the model perform on the validation data?
 ``` {r}
 modelError <- function(fit, data) {
   missClass <- sum(predict(fit, data) == data$classe)
   err <- missClass / nrow(data)
-  return(err * 100)
+  return(100 - err * 100)
 }
 
-modelError(rf, validate)
+me <- modelError(rf, validate)
+me
 ```
 
+I calculated an out-of-sample estimate of `r me`, which is prety close to that
+given as the random forest's OOB estimate.
+
+### Examining the Initial Model: Error vs. Number of Trees
+``` {r}
+plot(rf)
+legend("topright", legend=colnames(rf$err.rate), lty=seq(ncol(rf$err.rate)), col=seq(ncol(rf$err.rate)))
+```
+
+After only 50 trees or so, the error rate has settled nicely. So the default 
+500 trees is probably overkill.
+
+### Examining the Initial Model: Variable Importance
+Now that the model is trained, it's interesting to have a look at variable
+importance. Since the model appears to be very accurate, could we trim this 
+model, for better scalability, without sacrificing too much accuracy?
+``` {r}
+order <- order(-rf$importance)
+plot(rf$importance[order])
+```
+
+The out-of-sample error estimate is low; the plot of 
+variable importance shows that a few variables explain most of the 
+prediction. Taken together, these facts make it seem likely that an 
+accurate model can be built using much fewer of the variables.
+
+## Random Forest - Minimized Model
+I'll try training a new "minimized" random forest, using only the top 15 
+variables, and using only 100 trees.
+``` {r cache=T}
+impNames <- rownames(rf$importance)[order]
+minimal <- c(impNames[1:15], "classe")
+dp2 <- createDataPartition(y=train_all$classe, p=0.75, list=F) 
+train2 <- train_all[dp,minimal]
+validate2 <- train_all[-dp,minimal]
+rf2 <- randomForest(classe ~ ., data=train2, ntree=100)
+rf2
+```
+
+### Minimized Model: Out-of-Sample error
+The minimized model has a slightly reduced OOB estimate, but it's still quite
+good. How does it perform on the validation data set?
+
+``` {r}
+me2 <- modelError(rf2, validate2)
+me2
+```
+
+Once again, a similar figure is reported for the out-of-sample estimate.
+
+### Minimized Model: Error vs. Number of Trees
+``` {r}
+plot(rf2)
+legend("topright", legend=colnames(rf2$err.rate), lty=seq(ncol(rf2$err.rate)),
+col=seq(ncol(rf2$err.rate)))
+```
+
+Again, after 50 trees or so, the error rate has settled nicely. So this
+"minimal" model should predict with reasonable accuracy.
+
+## Model Final Test
+As a final test, I'll compare results between the initial and the minimal
+models, on the test data. This will be a relative test, comparing the results
+of a complex and a simple model, but I won't feed back any info garnered here
+back into the models. Therefore I think this is an allowed use of test data.
+``` {r}
+test <- read.csv("pml-testing.csv")
+answers <- predict(rf, test)
+answers2 <- predict(rf2, test)
+all(answers == answers2)
+```
+
+## Conclusions
+* Complex and a simple fandom forest models were built; both achieved 
+ reasonable OOB estimates
+* out-of-sample estimates were calculated using cross-validation; the results
+were similar to the OOB estimates.
+* The models predicted identical results on the reserved test data set.
+
+
 ``` {r eval=FALSE, echo=FALSE}
-# ``` {r eval=T, echo=T}
 test <- read.csv("pml-testing.csv")
 answers <- predict(rf, test)
 pml_write_files = function(x){
@@ -168,5 +250,11 @@ pml_write_files = function(x){
 answers
 pml_write_files(answers)
 ```
+## Appendix - Reproducibility
+For reproducibility, here's the output of sessionInfo():
+``` {r}
+sessionInfo()
+```
+
 ## References
 
