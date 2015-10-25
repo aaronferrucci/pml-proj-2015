@@ -28,7 +28,7 @@ Accelometer devices make it possible to collect data from subjects
 performing weight-lifting exercises. It's possible that user technique
 during such exercises may be significant - indicating risk of injury, or
 low rate of improvement. Quantifying the _quality_ of exercise; whether
-in real time, or in post-processing - could be a valuable training aid.
+in real time, or in post-processing could be a valuable training aid.
 
 This project takes as input a set of data gathered during weight-lifting
 exercises, and attempts to discern, via machine learning classification
@@ -61,7 +61,7 @@ table(train_all$classe, train_all$user_name)
 ```
 
 ## Reducing Covariates
-To improve scalablity of any classification algorithms, it's worth trying to
+To improve scalability of any classification algorithm, it's worth trying to
 reduce the data size to only those measurements which matter. 
 
 The dataset contains a large number measurements which are NA or empty string
@@ -76,12 +76,13 @@ t
 When a measurement contains any missing values, it contains a 
 large number of them (`r rownames(t)[2]` out of `r nrow(train_all)` 
 total measurements).  Looking closer, I
-see that the missing measurements have actual values when the variable
-`r "new_window"` is "yes". The names of the missing measurements indicate that
-these are summary statistics (min, max, avg, etc.) - in other words, they are
-transformed tidy covariates / Level 2 covariates. In the interest of letting
-a machine learning algorithm discover the necessary variables, I will discard
-all transformed covariates.
+see that variables which have mostly missing values have actual values when 
+the variable `r "new_window"` is "yes". The names of those variables 
+indicate that they are summary statistics (min, max, avg, etc.) - in other 
+words, they are
+transformed tidy or Level 2 covariates. In the interest of letting
+the machine learning algorithm discover the necessary variables, I will 
+discard all these transformed covariates.
 
 ``` {r}
 train_all <- train_all[, nas == 0]
@@ -140,10 +141,10 @@ out-of-sample error.  For this model, the OOB estimate was very low,
 indicating a good fit without danger of overfitting.
 
 ### Out-of-Sample error: Home brew
-For pedagogical reasons, I'll implement my own out-of-sample estimate, using 
-the reserved validation data.  The concept here is that since I don't have 
-access to the test data, I estimate the error on the test set using training 
-data which was separated out before building the model.
+As a cross-check, I'll implement my own out-of-sample estimate, using 
+the reserved validation data. The concept here is that since I don't have 
+access to the test data, I'll estimate the error on the test set using 
+training data which was separated out before building the model.
 
 How does the model perform on the validation data?
 ``` {r}
@@ -230,7 +231,7 @@ all(answers == answers2)
 ```
 
 ## Conclusions
-* Complex and a simple fandom forest models were built; both achieved 
+* A complex and a simple random forest model were built; both achieved 
  reasonable OOB estimates
 * out-of-sample estimates were calculated using cross-validation; the results
 were similar to the OOB estimates.

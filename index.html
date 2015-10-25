@@ -97,7 +97,7 @@ img {
 </div>
 <div id="reducing-covariates" class="section level2">
 <h2>Reducing Covariates</h2>
-<p>To improve scalablity of any classification algorithms, it’s worth trying to reduce the data size to only those measurements which matter.</p>
+<p>To improve scalability of any classification algorithm, it’s worth trying to reduce the data size to only those measurements which matter.</p>
 <p>The dataset contains a large number measurements which are NA or empty string (“”):</p>
 <pre class="r"><code>nas &lt;- apply(train_all, 2, function(x) sum(ifelse(is.na(x), 1, 1 * (x == &quot;&quot;))))
 t &lt;- table(nas)
@@ -150,7 +150,7 @@ rf</code></pre>
 </div>
 <div id="out-of-sample-error-home-brew" class="section level3">
 <h3>Out-of-Sample error: Home brew</h3>
-<p>For pedagogical reasons, I’ll implement my own out-of-sample estimate, using the reserved validation data. The concept here is that since I don’t have access to the test data, I estimate the error on the test set using training data which was separated out before building the model.</p>
+<p>As a cross-check, I’ll implement my own out-of-sample estimate, using the reserved validation data. The concept here is that since I don’t have access to the test data, I’ll estimate the error on the test set using training data which was separated out before building the model.</p>
 <p>How does the model perform on the validation data?</p>
 <pre class="r"><code>modelError &lt;- function(fit, data) {
   missClass &lt;- sum(predict(fit, data) == data$classe)
@@ -233,7 +233,7 @@ all(answers == answers2)</code></pre>
 <div id="conclusions" class="section level2">
 <h2>Conclusions</h2>
 <ul>
-<li>Complex and a simple fandom forest models were built; both achieved reasonable OOB estimates</li>
+<li>A complex and a simple random forest model were built; both achieved reasonable OOB estimates</li>
 <li>out-of-sample estimates were calculated using cross-validation; the results were similar to the OOB estimates.</li>
 <li>The models predicted identical results on the reserved test data set.</li>
 </ul>
